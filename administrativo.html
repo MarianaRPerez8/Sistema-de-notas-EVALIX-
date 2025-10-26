@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel Docentes Evalix</title>
+  <title>Panel Administrativo Evalix</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
   <style>
@@ -91,8 +91,8 @@
         font-size: .85rem;
       }
 
-      #gradesTable td .form-control,
-      #gradesTable td .form-select {
+      #studentsTable td .form-control,
+      #studentsTable td .form-select {
         font-size: .9rem;
       }
     }
@@ -102,8 +102,8 @@
         font-size: .9rem;
       }
 
-      #gradesTable td .form-control,
-      #gradesTable td .form-select {
+      #studentsTable td .form-control,
+      #studentsTable td .form-select {
         font-size: .95rem;
       }
     }
@@ -130,20 +130,6 @@
 
   <main class="container py-4">
     <div class="d-flex flex-wrap gap-3 align-items-end mb-3">
-      <div>
-        <label class="form-label"><strong>Año lectivo</strong></label>
-        <input type="number" id="anio" class="form-control" value="2025" min="2000" max="2100">
-      </div>
-      <div>
-        <label class="form-label"><strong>Período</strong></label>
-        <select id="periodo" class="form-select">
-          <option value="1">Período 1</option>
-          <option value="2">Período 2</option>
-          <option value="3">Período 3</option>
-          <option value="4">Período 4</option>
-        </select>
-      </div>
-
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="autoIdSwitch" checked>
         <label class="form-check-label" for="autoIdSwitch"><strong>Autogenerar ID</strong></label>
@@ -151,7 +137,7 @@
 
       <div class="ms-auto d-flex gap-2">
         <button class="btn btn-primary" id="addRowBtn">Agregar estudiante</button>
-        <button class="btn btn-success" id="saveBtn">Guardar</button>
+        <button class="btn btn-success" id="saveBtn">Guardar cambios</button>
         <button class="btn btn-secondary" id="exportBtn">Exportar CSV</button>
         <button class="btn btn-outline-danger" id="clearBtn">Limpiar todo</button>
       </div>
@@ -160,22 +146,19 @@
     <div class="alert alert-warning d-none" id="netStatus"></div>
 
     <div class="table-responsive">
-      <table class="table table-striped align-middle" id="gradesTable">
+      <table class="table table-striped align-middle" id="studentsTable">
         <thead class="table-header-claro">
           <tr>
-            <th>Id Estudiante</th>
-            <th style="min-width:160px;">Documento</th>
-            <th>Estudiante</th>
-            <th>Asignatura</th>
-            <th>Nota 1</th>
-            <th>Nota 2</th>
-            <th>Nota 3</th>
-            <th>Nota 4</th>
-            <th>Promedio</th>
-            <th></th>
+            <th>ID Estudiante</th>
+            <th style="min-width:140px;">Documento</th>
+            <th style="min-width:180px;">Nombre Completo</th>
+            <th style="min-width:140px;">Asignatura</th>
+            <th style="min-width:100px;">Año Lectivo</th>
+            <th style="min-width:100px;">Período</th>
+            <th style="min-width:80px;">Acciones</th>
           </tr>
         </thead>
-        <tbody id="gradesTbody"></tbody>
+        <tbody id="studentsTbody"></tbody>
       </table>
     </div>
   </main>
@@ -184,47 +167,43 @@
     // =========================
     //  CONFIG / API ENDPOINTS
     // =========================
-    // Si no tienes servidor disponible deja API_BASE como cadena vacía ('')
-    // En el futuro puedes poner la URL del backend (p. ej. 'https://mi-backend.com')
-    const API_BASE = ''; // <-- cambiado a vacío para evitar intentos de conexión al servidor
+    const API_BASE = 'https://68fe81337c700772bb13ddbe.mockapi.io'
     const ROUTES = {
-      list: (anio, periodo) => API_BASE ? `${API_BASE}/api/grades/${encodeURIComponent(anio)}/${encodeURIComponent(periodo)}` : null,
-      save: (anio, periodo) => API_BASE ? `${API_BASE}/api/grades/${encodeURIComponent(anio)}/${encodeURIComponent(periodo)}` : null
+      list: () => `${API_BASE}/Admin`,
+      save: () => `${API_BASE}/Admin`
     };
 
-    // ---- Catálogo ----
-    const MATERIAS = ['Matemáticas', 'Español', 'Ciencias'];
 
-    // ---- Utilidades ----
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    function toNumber(v) { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; }
-    function clampNota(n) { n = toNumber(n); if (n < 0) n = 0; if (n > 5) n = 5; return n; }
+    // ---- Catálogo ----
+    const MATERIAS = ['Matemáticas', 'Español', 'Ciencias', 'Inglés', 'Educación Física', 'Artes'];
+    const PERIODOS = [1, 2, 3, 4];
 
     // ---- Estado ----
-    const STORAGE_KEY = 'evalix_grades';
-    let state = { anio: 2025, periodo: 1, nextId: 1001, autoId: true, rows: [] };
+    const STORAGE_KEY = 'evalix_students';
+    let state = { nextId: 1001, autoId: true, rows: [] };
 
     // ---- DOM ----
-    const tbody = document.getElementById('gradesTbody');
-    const anioInput = document.getElementById('anio');
-    const periodoSel = document.getElementById('periodo');
+    const tbody = document.getElementById('studentsTbody');
     const autoIdSwitch = document.getElementById('autoIdSwitch');
     const userEmailSpan = document.getElementById('userEmail');
     const netStatus = document.getElementById('netStatus');
 
     // =========================
-    //  SESIÓN (igual que tu versión)
+    //  SESIÓN
     // =========================
     (function checkSession() {
       const u = localStorage.getItem('evalix_user');
       if (!u) { window.location.href = 'login.html'; return; }
       const user = JSON.parse(u);
       userEmailSpan.textContent = user.email || '';
-      if (user.role !== 'profesor') { window.location.href = 'login.html'; }
+      if (user.tipo !== 'administrativo') {
+        alert('Acceso denegado. Solo usuarios administrativos pueden acceder.');
+        window.location.href = 'login.html';
+      }
     })();
 
     // =========================
-    //  API HELPERS (async/await + fetch) con fallback a localStorage
+    //  API HELPERS
     // =========================
     function getAuthHeaders() {
       try {
@@ -234,21 +213,19 @@
       return {};
     }
 
-    async function apiGetGrades(anio, periodo) {
-      // Si no hay API_BASE definido, devolvemos datos desde localStorage
+    async function apiGetStudents() {
       if (!API_BASE) {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return { anio, periodo, nextId: 1001, autoId: true, rows: [] };
+        if (!raw) return { nextId: 1001, autoId: true, rows: [] };
         try {
           return JSON.parse(raw);
         } catch (e) {
-          console.warn('Error parseando localStorage en apiGetGrades:', e);
-          return { anio, periodo, nextId: 1001, autoId: true, rows: [] };
+          console.warn('Error parseando localStorage:', e);
+          return { nextId: 1001, autoId: true, rows: [] };
         }
       }
 
-      // Si hay backend, intentamos fetch como antes
-      const url = ROUTES.list(anio, periodo);
+      const url = ROUTES.list();
       const res = await fetch(url, {
         headers: { 'Accept': 'application/json', ...getAuthHeaders() },
         credentials: 'include'
@@ -258,20 +235,18 @@
       return res.json();
     }
 
-    async function apiSaveGrades(anio, periodo, payload) {
-      // Si no hay API_BASE definido, guardamos en localStorage y devolvemos éxito
+    async function apiSaveStudents(payload) {
       if (!API_BASE) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
           return { ok: true, localOnly: true };
         } catch (e) {
-          console.error('Error guardando en localStorage en apiSaveGrades:', e);
+          console.error('Error guardando en localStorage:', e);
           throw e;
         }
       }
 
-      // Si hay backend, hacemos PUT como antes
-      const url = ROUTES.save(anio, periodo);
+      const url = ROUTES.save();
       const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...getAuthHeaders() },
@@ -284,55 +259,38 @@
     }
 
     // =========================
-    //  CARGA INICIAL (con fallback a localStorage)
+    //  CARGA INICIAL
     // =========================
-    (async function loadState() {
-      try {
-        // apiGetGrades gestiona fallback si API_BASE está vacío
-        const server = await apiGetGrades(state.anio, state.periodo);
-        if (server && server.rows) {
-          state = Object.assign({ nextId: 1001, autoId: true, rows: [] }, server);
-          // Si estamos trabajando localOnly (no servidor), mostrar estado acorde
-          if (!API_BASE) {
-            showNetStatus('Datos cargados desde el navegador (localStorage).', 'success');
-          } else {
-            showNetStatus('Datos cargados del servidor.', 'success');
-          }
-        } else {
-          showNetStatus('No se encontraron datos; iniciando vacío.', 'info');
-        }
-      } catch (err) {
-        // Si falla el fetch al servidor, usamos localStorage
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          try {
-            const saved = JSON.parse(raw);
-            state = Object.assign({ nextId: 1001, autoId: true }, saved);
-            showNetStatus('Sin conexión al servidor. Usando datos locales.', 'warning');
-          } catch (e) {
-            showNetStatus('No se pudo leer el guardado local. Iniciando vacío.', 'danger');
-          }
-        } else {
-          showNetStatus('Servidor no disponible y sin datos locales. Iniciando vacío.', 'danger');
-        }
-      }
+  // =========================
+//  API HELPERS (MockAPI)
+// =========================
+async function apiGetStudents() {
+  const res = await fetch(ROUTES.list());
+  if (!res.ok) throw new Error(`GET error → ${res.status}`);
+  return res.json();
+}
 
-      // Normaliza nextId
-      const maxId = state.rows.reduce((m, r) => {
-        const n = parseInt(r.idEst, 10);
-        return isNaN(n) ? m : Math.max(m, n);
-      }, 1000);
-      if (!Number.isInteger(state.nextId) || state.nextId <= maxId) {
-        state.nextId = maxId + 1;
-      }
-
-      // Pinta UI
-      anioInput.value = state.anio || 2025;
-      periodoSel.value = String(state.periodo || '1');
-      autoIdSwitch.checked = !!state.autoId;
-      renderRows();
-    })();
-
+async function apiSaveStudents() {
+  for (const r of state.rows) {
+    // Si tiene un id interno de MockAPI, hacemos PUT (actualizar)
+    if (r.mockId) {
+      await fetch(`${ROUTES.save()}/${r.mockId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(r)
+      });
+    } else {
+      // Si es nuevo, hacemos POST
+      const res = await fetch(ROUTES.save(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(r)
+      });
+      const data = await res.json();
+      r.mockId = data.id; // Guardamos id generado por MockAPI
+    }
+  }
+}
     // =========================
     //  UI / RENDER
     // =========================
@@ -340,76 +298,81 @@
       tbody.innerHTML = '';
       state.rows.forEach((r, idx) => {
         const tr = document.createElement('tr');
-        const prom = calcPromedio(r);
-        const options = MATERIAS.map(m => `<option value="${m}" ${r.asignatura === m ? 'selected' : ''}>${m}</option>`).join('');
+        const materiasOptions = MATERIAS.map(m => `<option value="${m}" ${r.asignatura === m ? 'selected' : ''}>${m}</option>`).join('');
+        const periodosOptions = PERIODOS.map(p => `<option value="${p}" ${r.periodo == p ? 'selected' : ''}>${p}</option>`).join('');
+
         const idCell = `
           <div class="input-group input-group-sm">
             <input class="form-control" value="${r.idEst || ''}" data-k="idEst" ${state.autoId ? 'readonly' : ''}>
-            ${(!r.idEst && state.autoId) ? `<button class="btn btn-outline-secondary" type="button" data-assign-id="${idx}">Asignar</button>` : ''}
           </div>`;
 
         tr.innerHTML = `
           <td>${idCell}</td>
-          <td><input class="form-control form-control-sm" value="${r.documento || ''}" data-k="documento"></td>
-          <td><input class="form-control form-control-sm" value="${r.nombre || ''}" data-k="nombre"></td>
+          <td><input class="form-control form-control-sm" value="${r.documento || ''}" data-k="documento" placeholder="Ej: 1234567890"></td>
+          <td><input class="form-control form-control-sm" value="${r.nombre || ''}" data-k="nombre" placeholder="Nombre completo"></td>
           <td>
             <select class="form-select form-select-sm" data-k="asignatura">
               <option value="">-- Seleccione --</option>
-              ${options}
+              ${materiasOptions}
             </select>
           </td>
-          <td><input class="form-control form-control-sm nota" type="number" step="0.1" min="0" max="5" value="${r.n1 ?? ''}" data-k="n1"></td>
-          <td><input class="form-control form-control-sm nota" type="number" step="0.1" min="0" max="5" value="${r.n2 ?? ''}" data-k="n2"></td>
-          <td><input class="form-control form-control-sm nota" type="number" step="0.1" min="0" max="5" value="${r.n3 ?? ''}" data-k="n3"></td>
-          <td><input class="form-control form-control-sm nota" type="number" step="0.1" min="0" max="5" value="${r.n4 ?? ''}" data-k="n4"></td>
-          <td><span class="prom-badge badge bg-${prom >= 3 ? 'success' : 'danger'}">${prom ? prom.toFixed(2) : '0.00'}</span></td>
+          <td><input class="form-control form-control-sm" type="number" value="${r.anio || 2025}" data-k="anio" min="2000" max="2100"></td>
+          <td>
+            <select class="form-select form-select-sm" data-k="periodo">
+              <option value="">--</option>
+              ${periodosOptions}
+            </select>
+          </td>
           <td><button type="button" class="btn btn-sm btn-outline-danger" data-del="${idx}">Eliminar</button></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    function nextId() { const id = state.nextId; state.nextId += 1; return String(id); }
-    function ensureRowId(r) { if (!r.idEst && state.autoId) r.idEst = nextId(); }
-    function calcPromedio(r) {
-      const notas = [r.n1, r.n2, r.n3, r.n4].map(clampNota).filter(v => v > 0);
-      const prom = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
-      r.prom = prom; return prom;
+    function nextId() {
+      const id = state.nextId;
+      state.nextId += 1;
+      return String(id);
+    }
+
+    function ensureRowId(r) {
+      if (!r.idEst && state.autoId) r.idEst = nextId();
     }
 
     function addRow(prefill = {}) {
-      const row = { idEst: prefill.idEst || '', documento: prefill.documento || '', nombre: prefill.nombre || '', asignatura: prefill.asignatura || '', n1: prefill.n1 ?? '', n2: prefill.n2 ?? '', n3: prefill.n3 ?? '', n4: prefill.n4 ?? '', prom: 0 };
+      const row = {
+        idEst: prefill.idEst || '',
+        documento: prefill.documento || '',
+        nombre: prefill.nombre || '',
+        asignatura: prefill.asignatura || '',
+        anio: prefill.anio || 2025,
+        periodo: prefill.periodo || ''
+      };
       ensureRowId(row);
       state.rows.push(row);
       renderRows();
     }
 
     // =========================
-    //  GUARDAR (sincroniza servidor y cachea en local)
+    //  GUARDAR
     // =========================
     async function saveState() {
-      // Captura valores actuales del header
-      state.anio = parseInt(anioInput.value, 10) || 2025;
-      state.periodo = parseInt(periodoSel.value, 10) || 1;
       state.autoId = !!autoIdSwitch.checked;
 
-      // Guarda en local inmediatamente (cache optimista)
+      // Guarda en local inmediatamente
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (e) {
         console.error('Error guardando en localStorage:', e);
       }
 
-      // Si no hay API configurada, no intentamos sincronizar con servidor
       if (!API_BASE) {
-        // Mensaje informativo (guardado local)
         showNetStatus('Datos guardados correctamente en el navegador.', 'success');
         return;
       }
 
-      // Si hay API, intentamos sincronizar con el servidor
+      // Sincroniza con servidor si existe API
       try {
-        const payload = { anio: state.anio, periodo: state.periodo, nextId: state.nextId, autoId: state.autoId, rows: state.rows };
-        await apiSaveGrades(state.anio, state.periodo, payload);
+        await apiSaveStudents();
         showNetStatus('Guardado en el servidor correctamente.', 'success');
       } catch (err) {
         showNetStatus('No se pudo guardar en el servidor. Los cambios quedan en este navegador.', 'warning');
@@ -417,18 +380,21 @@
     }
 
     // =========================
-    //  EXPORT CSV (async para futuras extensiones)
+    //  EXPORT CSV
     // =========================
     async function exportCSV() {
-      const headers = ['Id Estudiante', 'Documento', 'Estudiante', 'Asignatura', 'Nota 1', 'Nota 2', 'Nota 3', 'Nota 4', 'Promedio'];
-      const rows = state.rows.map(r => [r.idEst, r.documento, r.nombre, r.asignatura, r.n1 ?? '', r.n2 ?? '', r.n3 ?? '', r.n4 ?? '', (r.prom ?? 0).toFixed(2)]);
+      const headers = ['ID Estudiante', 'Documento', 'Nombre Completo', 'Asignatura', 'Año Lectivo', 'Período'];
+      const rows = state.rows.map(r => [r.idEst, r.documento, r.nombre, r.asignatura, r.anio, r.periodo || '']);
       const csv = [headers.join(','), ...rows.map(cols => cols.map(v => typeof v === 'string' && v.includes(',') ? `"${v.replaceAll('"', '""')}"` : v).join(','))].join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `evalix_${state.anio}_P${state.periodo}.csv`;
-      document.body.appendChild(a); a.click();
-      URL.revokeObjectURL(url); a.remove();
+      a.href = url;
+      a.download = `evalix_estudiantes_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
     }
 
     // =========================
@@ -437,20 +403,18 @@
     document.getElementById('addRowBtn').addEventListener('click', () => addRow());
     document.getElementById('saveBtn').addEventListener('click', () => { saveState(); });
     document.getElementById('clearBtn').addEventListener('click', () => {
-      if (confirm('Esto eliminará todas las filas guardadas localmente. ¿Continuar?')) {
+      if (confirm('Esto eliminará TODOS los estudiantes registrados. ¿Continuar?')) {
         state.rows = [];
         localStorage.removeItem(STORAGE_KEY);
         renderRows();
+        showNetStatus('Todos los datos han sido eliminados.', 'info');
       }
     });
     document.getElementById('exportBtn').addEventListener('click', exportCSV);
 
-    // ✅ LOGOUT funcional
     document.getElementById('logoutBtn').addEventListener('click', () => {
       localStorage.removeItem('evalix_user');
-      // (Opcional) si quieres limpiar las notas locales en el logout, descomenta:
-      // localStorage.removeItem('evalix_grades');
-      window.location.replace('login.html'); // evita volver con "atrás"
+      window.location.replace('login.html');
     });
 
     // Delegación de eventos para eliminar filas
@@ -459,12 +423,14 @@
       if (!btn) return;
       const index = parseInt(btn.getAttribute('data-del'), 10);
       if (Number.isInteger(index)) {
-        state.rows.splice(index, 1);
-        renderRows();
+        if (confirm('¿Eliminar este estudiante?')) {
+          state.rows.splice(index, 1);
+          renderRows();
+        }
       }
     });
 
-    // Edición de celdas (recalcula promedio al vuelo)
+    // Edición de celdas
     tbody.addEventListener('input', (e) => {
       const input = e.target.closest('[data-k]');
       if (!input) return;
@@ -472,9 +438,18 @@
       const idx = [...tbody.children].indexOf(tr);
       const key = input.getAttribute('data-k');
       let val = input.value;
-      if (['n1', 'n2', 'n3', 'n4'].includes(key)) { val = clampNota(val); input.value = val; }
+
+      // Validaciones específicas
+      if (key === 'anio') {
+        val = parseInt(val, 10);
+        if (isNaN(val) || val < 2000 || val > 2100) val = 2025;
+      }
+      if (key === 'periodo') {
+        val = parseInt(val, 10);
+        if (![1, 2, 3, 4].includes(val)) val = '';
+      }
+
       state.rows[idx][key] = val;
-      renderRows(); // repinta para actualizar promedio
     });
 
     // =========================
@@ -484,10 +459,15 @@
       netStatus.classList.remove('d-none', 'alert-info', 'alert-success', 'alert-warning', 'alert-danger');
       netStatus.classList.add(`alert-${type}`);
       netStatus.textContent = msg;
+      setTimeout(() => {
+        netStatus.classList.add('d-none');
+      }, 5000);
     }
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
 </body>
 
 </html>
